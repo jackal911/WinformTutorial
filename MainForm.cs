@@ -33,12 +33,11 @@ namespace GenericView
             string[] f = File.ReadAllLines(path);
             
             TreeNode rootNode = new TreeNode("root");
-            int index = 0; // ref에 얹기 위해 초기화. 여기선 쓸모없고 내부에서 사용 목적
-            int id = 0; // // ref에 얹기 위해 초기화. 여기선 쓸모없고 내부에서 사용 목적
+            int index = 0; // ref에 얹기 위해 초기화. 외부에서는 의미가 없다
+            int id = 0;
             addNode(f, ref rootNode, ref index, ref id);
             treeView1.Nodes.Add(rootNode);
             //printAllNodes(rootNode);
-            //findNodeByText(rootNode, "CONTOUR");
             parseAndDraw(rootNode);
         }
 
@@ -112,9 +111,23 @@ namespace GenericView
                 }
             }
         }
+        
+        // 트리 전체 조회하는 함수
+        void printAllNodes(TreeNode parentNode)
+        {
+            foreach (TreeNode node in parentNode.Nodes)
+            {
+                Console.WriteLine(node.Text);
+                printAllNodes(node);
+            }
+            if (parentNode.Nodes.Count != 0)
+            {
+                Console.WriteLine("END_OF_{0}", parentNode.Text);
+            }
+        }
 
-        // CONTOUR의 node text로 entity를 잘라내 list로 리턴하는 함수
-        List<double> findEntityByIndex(TreeNode parentNode, int index) 
+        // CONTOUR 자식 노드의 index로 entity의 시작점과 끝점을 구해서 list에 담아 리턴하는 함수
+        List<double> findContourEntityByIndex(TreeNode parentNode, int index)
         {
             List<double> tnList = new List<double>();
             bool isWhatImTalkin = false;
@@ -128,7 +141,7 @@ namespace GenericView
                 {
                     tnList.Add(double.Parse(node.Text.Split('=')[1]));
                 }
-                
+
                 if (node.Text.StartsWith("V="))
                 {
                     if (isWhatImTalkin)
@@ -145,18 +158,18 @@ namespace GenericView
             return tnList;
         }
 
-        // 트리 전체 조회하는 함수
-        void printAllNodes(TreeNode parentNode)
+        // STRING 노드의 px, py 구하는 함수
+        List<double> findStringEntity(TreeNode parentNode)
         {
+            List<double> tnList = new List<double>();
             foreach (TreeNode node in parentNode.Nodes)
             {
-                Console.WriteLine(node.Text);
-                printAllNodes(node);
+                if (node.Text.StartsWith("STRING_POSITION_"))
+                {
+                    tnList.Add(double.Parse(node.Text.Split('=')[1]));
+                }
             }
-            if (parentNode.Nodes.Count != 0)
-            {
-                Console.WriteLine("END_OF_{0}", parentNode.Text);
-            }
+            return tnList;            
         }
 
         // 모든 CONTOUR와 STRING을 그리는 함수
@@ -213,17 +226,17 @@ namespace GenericView
                 if (points[i]["RADIUS"] == 0)
                 {
                     //ui_canvas2D.DrawCanvas.SelectEntity();
-                    Console.WriteLine(ui_canvas2D.DrawCanvas.AddLine(u, v, points[i]["U"], points[i]["V"]));
+                    ui_canvas2D.DrawCanvas.AddLine(u, v, points[i]["U"], points[i]["V"]); // Console 찍어보면 addline, addarc, addstring에 인덱스가 1씩 증가하며 매겨 지는걸 볼 수 있다.
                 }
                 else
                 {
                     if (points[i]["AMP"] < 0)
                     {
-                        Console.WriteLine(ui_canvas2D.DrawCanvas.AddArc(points[i]["ORIGIN_U"], points[i]["ORIGIN_V"], -points[i]["RADIUS"], u, v, points[i]["U"], points[i]["V"]));
+                        ui_canvas2D.DrawCanvas.AddArc(points[i]["ORIGIN_U"], points[i]["ORIGIN_V"], -points[i]["RADIUS"], u, v, points[i]["U"], points[i]["V"]);
                     }
                     else
                     {
-                        Console.WriteLine(ui_canvas2D.DrawCanvas.AddArc(points[i]["ORIGIN_U"], points[i]["ORIGIN_V"], points[i]["RADIUS"], u, v, points[i]["U"], points[i]["V"]));
+                        ui_canvas2D.DrawCanvas.AddArc(points[i]["ORIGIN_U"], points[i]["ORIGIN_V"], points[i]["RADIUS"], u, v, points[i]["U"], points[i]["V"]);
                     }                    
                 }
                 u = points[i]["U"];
@@ -235,36 +248,48 @@ namespace GenericView
         // string데이터 삽입
         void writeString(Dictionary<string, string> properties)
         {
-            Console.WriteLine(ui_canvas2D.DrawCanvas.AddText(double.Parse(properties["STRING_POSITION_U"]), double.Parse(properties["STRING_POSITION_V"]), double.Parse(properties["STRING_HEIGHT"]), double.Parse(properties["STRING_ANGLE"]), 0, properties["STRING"]));            
+            ui_canvas2D.DrawCanvas.AddText(double.Parse(properties["STRING_POSITION_U"]), double.Parse(properties["STRING_POSITION_V"]), double.Parse(properties["STRING_HEIGHT"]), double.Parse(properties["STRING_ANGLE"]), 0, properties["STRING"]);            
         }
         
         // 노드 선택하면 캔버스에 해당 노드 색이 빨간색으로 변하는 함수
         private void treeView1_AfterSelect(object sender, TreeViewEventArgs e)
         {
-            // 1. TreeNode Contour ->  시작 좌표  U, V
-            // 2. 화면에 있는 부재 형상을 가져와서
-            // 3. U,V 동일한 시작점을 가진 Entity을 찾아서 선택함
             int hDC = ui_canvas2D.DrawCanvas.GetHdc();
-            if (e.Node.Parent == null || e.Node.Parent.Text != "CONTOUR")
+            if (e.Node.Parent == null || (e.Node.Parent.Text != "CONTOUR" && e.Node.Parent.Text != "STRING"))
             {
                 ui_canvas2D.DrawCanvas.DeselectAll(hDC);
                 return;
             }
 
-            List<double> points = findEntityByIndex(e.Node.Parent, e.Node.Index);
             List<Entity> entityAllList = ui_canvas2D.DrawCanvas.ViewModel.ToList();
             Entity selectedEntity = null;
-            Console.WriteLine("x : {0}, y : {1}", points[0], points[1]);
-            foreach (Entity entity in entityAllList)
+            List<double> points;
+            if (e.Node.Parent.Text == "CONTOUR")
             {
-                // Console.WriteLine("entity sx : {0}, sy : {1}", entity.Sx, entity.Sy);
-                // U,V와 동일한 Entity Break
-                if (entity.Sx == points[0] && entity.Sy == points[1])
+                points = findContourEntityByIndex(e.Node.Parent, e.Node.Index);
+                foreach (Entity entity in entityAllList)
                 {
-                    selectedEntity = entity;
-                    break;
+                    if (entity.Sx == points[0] && entity.Sy == points[1])
+                    {
+                        selectedEntity = entity;
+                        break;
+                    }
                 }
             }
+            else
+            {
+                points = findStringEntity(e.Node.Parent);
+                foreach (Entity entity in entityAllList)
+                {
+                    if (entity.Px == points[0] && entity.Py == points[1])
+                    {
+                        selectedEntity = entity;
+                        break;
+                    }
+                }
+            }           
+            
+            Console.WriteLine("x : {0}, y : {1}", points[0], points[1]);            
 
             ui_canvas2D.DrawCanvas.DeselectAll(hDC);
             ui_canvas2D.DrawCanvas.SelectEntity(hDC, selectedEntity);
