@@ -109,7 +109,7 @@ namespace GenericView
                         sbj = sbj.Replace("START_OF_", "");
                         sbj = sbj.Replace("_DATA", "");
                         TreeNode childNode = new TreeNode(sbj);
-                        if(sbj=="CONTOUR"||sbj=="STRING")
+                        if(sbj=="CONTOUR"||sbj=="STRING") // 순서대로 id 부여함. 현재 코드에선 태그 자체가 필요없음
                         {
                             nodeTag tag = new nodeTag();
                             tag.id = id;
