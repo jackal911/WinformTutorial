@@ -34,11 +34,56 @@ namespace GenericView
             
             TreeNode rootNode = new TreeNode("root");
             int index = 0; // ref에 얹기 위해 초기화. 외부에서는 의미가 없다
-            int id = 0;
+            int id = 0; // id로 추적해서 캔버스에 색칠하기 위해 사용. hdc를 사용하는 방법에선 없어도 된다.
             addNode(f, ref rootNode, ref index, ref id);
             treeView1.Nodes.Add(rootNode);
             //printAllNodes(rootNode);
             parseAndDraw(rootNode);
+        }
+
+        // 노드 선택하면 캔버스에 해당 노드 색이 빨간색으로 변한다.
+        private void treeView1_AfterSelect(object sender, TreeViewEventArgs e)
+        {
+            int hDC = ui_canvas2D.DrawCanvas.GetHdc();
+            if (e.Node.Parent == null || (e.Node.Parent.Text != "CONTOUR" && e.Node.Parent.Text != "STRING"))
+            {
+                ui_canvas2D.DrawCanvas.DeselectAll(hDC);
+                return;
+            }
+
+            List<Entity> entityAllList = ui_canvas2D.DrawCanvas.ViewModel.ToList();
+            Entity selectedEntity = null;
+            List<double> points;
+            if (e.Node.Parent.Text == "CONTOUR")
+            {
+                points = findContourEntityByIndex(e.Node.Parent, e.Node.Index);
+                foreach (Entity entity in entityAllList)
+                {
+                    if (entity.Sx == points[0] && entity.Sy == points[1])
+                    {
+                        selectedEntity = entity;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                points = findStringEntity(e.Node.Parent);
+                foreach (Entity entity in entityAllList)
+                {
+                    if (entity.Px == points[0] && entity.Py == points[1])
+                    {
+                        selectedEntity = entity;
+                        break;
+                    }
+                }
+            }
+
+            Console.WriteLine("x : {0}, y : {1}", points[0], points[1]);
+
+            ui_canvas2D.DrawCanvas.DeselectAll(hDC);
+            ui_canvas2D.DrawCanvas.SelectEntity(hDC, selectedEntity);
+            ui_canvas2D.DrawCanvas.ReleaseHdc(hDC);
         }
 
         class nodeTag
@@ -249,51 +294,6 @@ namespace GenericView
         void writeString(Dictionary<string, string> properties)
         {
             ui_canvas2D.DrawCanvas.AddText(double.Parse(properties["STRING_POSITION_U"]), double.Parse(properties["STRING_POSITION_V"]), double.Parse(properties["STRING_HEIGHT"]), double.Parse(properties["STRING_ANGLE"]), 0, properties["STRING"]);            
-        }
-        
-        // 노드 선택하면 캔버스에 해당 노드 색이 빨간색으로 변하는 함수
-        private void treeView1_AfterSelect(object sender, TreeViewEventArgs e)
-        {
-            int hDC = ui_canvas2D.DrawCanvas.GetHdc();
-            if (e.Node.Parent == null || (e.Node.Parent.Text != "CONTOUR" && e.Node.Parent.Text != "STRING"))
-            {
-                ui_canvas2D.DrawCanvas.DeselectAll(hDC);
-                return;
-            }
-
-            List<Entity> entityAllList = ui_canvas2D.DrawCanvas.ViewModel.ToList();
-            Entity selectedEntity = null;
-            List<double> points;
-            if (e.Node.Parent.Text == "CONTOUR")
-            {
-                points = findContourEntityByIndex(e.Node.Parent, e.Node.Index);
-                foreach (Entity entity in entityAllList)
-                {
-                    if (entity.Sx == points[0] && entity.Sy == points[1])
-                    {
-                        selectedEntity = entity;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                points = findStringEntity(e.Node.Parent);
-                foreach (Entity entity in entityAllList)
-                {
-                    if (entity.Px == points[0] && entity.Py == points[1])
-                    {
-                        selectedEntity = entity;
-                        break;
-                    }
-                }
-            }           
-            
-            Console.WriteLine("x : {0}, y : {1}", points[0], points[1]);            
-
-            ui_canvas2D.DrawCanvas.DeselectAll(hDC);
-            ui_canvas2D.DrawCanvas.SelectEntity(hDC, selectedEntity);
-            ui_canvas2D.DrawCanvas.ReleaseHdc(hDC);
         }
 
         #region Event
