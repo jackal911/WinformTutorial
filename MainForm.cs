@@ -29,15 +29,14 @@ namespace GenericView
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-            string path = @"C:\Users\sgkim\Desktop\이준호\GenericView\Sample\AD1P-BL6A-1-1P.gen";
+			string path = @"C:\Users\sgkim\Desktop\이준호\GenericView\Sample\AD1P-DK1A-2-1P.gen";
             string[] f = File.ReadAllLines(path);
             
             TreeNode rootNode = new TreeNode("root");
             int index = 0; // ref에 얹기 위해 초기화. 외부에서는 의미가 없다
-            int id = 0; // id로 추적해서 캔버스에 색칠하기 위해 사용. hdc를 사용하는 방법에선 없어도 된다.
-            addNode(f, ref rootNode, ref index, ref id);
+            addNode(f, ref rootNode, ref index);
             treeView1.Nodes.Add(rootNode);
-            //printAllNodes(rootNode);
+            printAllNodes(rootNode);
             parseAndDraw(rootNode);
         }
 
@@ -86,52 +85,79 @@ namespace GenericView
             ui_canvas2D.DrawCanvas.ReleaseHdc(hDC);
         }
 
-        class nodeTag
-        {
-            public int id { get; set; }
-        }
+		class nodeTag
+		{
+			public int id { get; set; }
+		}
+
+		// 모든 CONTOUR와 STRING을 그리는 함수
+		void parseAndDraw(TreeNode parentNode)
+		{
+			foreach (TreeNode node in parentNode.Nodes)
+			{
+				if (node.Text == "CONTOUR")
+				{
+					List<Dictionary<string, double>> points = new List<Dictionary<string, double>>();
+					points.Add(new Dictionary<string, double>());
+					int index = 0; // 다루고있는 딕셔너리의 주소를 가리키는 index
+					foreach (TreeNode nod in node.Nodes)
+					{
+						if (!nod.Text.Contains('=')) // bevel같이 하위노드를 가지는 노드는 =을 안가져서 뺀다.
+						{
+							continue;
+						}
+						string[] kvPair = nod.Text.Split('='); // key와 value
+						if (kvPair[0] == "AMP_U")
+						{
+							points.Add(new Dictionary<string, double>());
+							index++;
+						}
+						points[index].Add(kvPair[0], double.Parse(kvPair[1]));
+					}
+					drawLines(points);
+				}
+				else if (node.Text == "STRING")
+				{
+					Dictionary<string, string> properties = new Dictionary<string, string>();
+					foreach (TreeNode nod in node.Nodes)
+					{
+						string[] kvPair = nod.Text.Split('='); // key와 value
+						properties.Add(kvPair[0], kvPair[1]);
+					}
+					writeString(properties);
+				}
+				else
+				{
+					parseAndDraw(node);
+				}
+			}
+		}        
 
         // 제네릭 파일 조회해서 트리만드는 함수
-        void addNode(string[] lines, ref TreeNode parentNode, ref int index, ref int id)
+        void addNode(string[] lines, ref TreeNode parentNode, ref int index)
         {
             while (index < lines.Length)
             {
-                string sbj = lines[index];
+                string data = lines[index];
                 index++;
-                if(!sbj.Contains('='))
+                if(!data.Contains('='))
                 {                    
-                    if (sbj.StartsWith("END_OF_"))
+                    if (data.StartsWith("END_OF_"))
                     {
                         break;
                     }
                     else
                     {
-                        sbj = sbj.Replace("START_OF_", "");
-                        sbj = sbj.Replace("_DATA", "");
-                        TreeNode childNode = new TreeNode(sbj);
-                        if(sbj=="CONTOUR"||sbj=="STRING") // 순서대로 id 부여함. 현재 코드에선 태그 자체가 필요없음
-                        {
-                            nodeTag tag = new nodeTag();
-                            tag.id = id;
-                            childNode.Tag = tag;
-                        }
-                        addNode(lines, ref childNode, ref index, ref id);
+                        data = data.Replace("START_OF_", "");
+                        data = data.Replace("_DATA", "");
+                        TreeNode childNode = new TreeNode(data);
+                        addNode(lines, ref childNode, ref index);
                         parentNode.Nodes.Add(childNode);
                     }
                 }
                 else
                 {
-                    TreeNode childNode = new TreeNode(sbj);
-                    if (parentNode.Text == "CONTOUR" || parentNode.Text == "STRING")
-                    {
-                        nodeTag tag = new nodeTag();
-                        tag.id = id;
-                        childNode.Tag = tag;
-                        if (sbj.StartsWith("V=") || sbj.StartsWith("STRING="))
-                        {
-                            id++;
-                        }
-                    }
+                    TreeNode childNode = new TreeNode(data);
                     parentNode.Nodes.Add(childNode);
                 }
             }
@@ -217,83 +243,44 @@ namespace GenericView
             return tnList;            
         }
 
-        // 모든 CONTOUR와 STRING을 그리는 함수
-        void parseAndDraw(TreeNode parentNode)
-        {
-            foreach (TreeNode node in parentNode.Nodes)
-            {
-                if (node.Text == "CONTOUR")
-                {
-                    List<Dictionary<string, double>> points = new List<Dictionary<string, double>>();
-                    points.Add(new Dictionary<string, double>());
-                    int index = 0; // 다루고있는 딕셔너리의 주소를 가리키는 index
-                    foreach (TreeNode nod in node.Nodes)
-                    {
-                        if (!nod.Text.Contains('=')) // bevel같이 하위노드를 가지는 노드는 =을 안가져서 뺀다.
-                        {
-                            continue;
-                        }
-                        string[] kvPair = nod.Text.Split('='); // key와 value
-                        if (kvPair[0]=="AMP_U")
-                        {
-                            points.Add(new Dictionary<string, double>());
-                            index++;                            
-                        }
-                        points[index].Add(kvPair[0], double.Parse(kvPair[1]));
-                    }
-                    drawLines(points);
-                }
-                else if (node.Text == "STRING")
-                {
-                    Dictionary<string, string> properties = new Dictionary<string, string>();
-                    foreach (TreeNode nod in node.Nodes)
-                    {
-                        string[] kvPair = nod.Text.Split('='); // key와 value
-                        properties.Add(kvPair[0], kvPair[1]);
-                    }
-                    writeString(properties);
-                }
-                else
-                {
-                    parseAndDraw(node);
-                }
-            }
-        }
+        
 
         // list 받아서 그림그리는 함수
         void drawLines(List<Dictionary<string, double>> points)
         {
             double u = points[0]["START_U"];
             double v = points[0]["START_V"];
-            int i=1;
-            while(i<points.Count)
-            {
-                if (points[i]["RADIUS"] == 0)
-                {
-                    //ui_canvas2D.DrawCanvas.SelectEntity();
-                    ui_canvas2D.DrawCanvas.AddLine(u, v, points[i]["U"], points[i]["V"]); // Console 찍어보면 addline, addarc, addstring에 인덱스가 1씩 증가하며 매겨 지는걸 볼 수 있다.
-                }
-                else
-                {
-                    if (points[i]["AMP"] < 0)
-                    {
-                        ui_canvas2D.DrawCanvas.AddArc(points[i]["ORIGIN_U"], points[i]["ORIGIN_V"], -points[i]["RADIUS"], u, v, points[i]["U"], points[i]["V"]);
-                    }
-                    else
-                    {
-                        ui_canvas2D.DrawCanvas.AddArc(points[i]["ORIGIN_U"], points[i]["ORIGIN_V"], points[i]["RADIUS"], u, v, points[i]["U"], points[i]["V"]);
-                    }                    
-                }
-                u = points[i]["U"];
-                v = points[i]["V"];
-                i += 1;
-            }
+			int i = 1;
+			while (i < points.Count)
+			{
+				if (points[i]["RADIUS"] == 0)
+				{
+					ui_canvas2D.DrawCanvas.AddLine(u, v, points[i]["U"], points[i]["V"]); 
+				}
+				else
+				{
+					if (points[i]["AMP"] < 0)
+					{
+						ui_canvas2D.DrawCanvas.AddArc(points[i]["ORIGIN_U"], points[i]["ORIGIN_V"], -points[i]["RADIUS"], 
+							u, v, points[i]["U"], points[i]["V"]);
+					}
+					else
+					{
+						ui_canvas2D.DrawCanvas.AddArc(points[i]["ORIGIN_U"], points[i]["ORIGIN_V"], points[i]["RADIUS"], 
+							u, v, points[i]["U"], points[i]["V"]);
+					}
+				}
+				u = points[i]["U"];
+				v = points[i]["V"];
+				i++;
+			}
         }
 
         // string데이터 삽입
         void writeString(Dictionary<string, string> properties)
         {
-            ui_canvas2D.DrawCanvas.AddText(double.Parse(properties["STRING_POSITION_U"]), double.Parse(properties["STRING_POSITION_V"]), double.Parse(properties["STRING_HEIGHT"]), double.Parse(properties["STRING_ANGLE"]), 0, properties["STRING"]);            
+            ui_canvas2D.DrawCanvas.AddText(double.Parse(properties["STRING_POSITION_U"]), double.Parse(properties["STRING_POSITION_V"]),
+			double.Parse(properties["STRING_HEIGHT"]), double.Parse(properties["STRING_ANGLE"]), 0, properties["STRING"]);            
         }
 
         #region Event
