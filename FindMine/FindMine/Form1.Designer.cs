@@ -46,14 +46,14 @@
 			// 
 			this.flowLayoutPanel1.Location = new System.Drawing.Point(12, 55);
 			this.flowLayoutPanel1.Name = "flowLayoutPanel1";
-			this.flowLayoutPanel1.Size = new System.Drawing.Size(776, 533);
+			this.flowLayoutPanel1.Size = new System.Drawing.Size(200, 200);
 			this.flowLayoutPanel1.TabIndex = 1;
 			// 
 			// Form1
 			// 
 			this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 12F);
 			this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-			this.ClientSize = new System.Drawing.Size(800, 600);
+			this.ClientSize = new System.Drawing.Size(270, 330);
 			this.Controls.Add(this.flowLayoutPanel1);
 			this.Controls.Add(this.button1);
 			this.Name = "Form1";
