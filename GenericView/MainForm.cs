@@ -29,7 +29,7 @@ namespace GenericView
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-			string path = @"C:\Users\sgkim\Desktop\이준호\GenericView\Sample\AD1P-DK1A-2-1P.gen";
+            string path = @"C:\Users\sgkim\Desktop\lee\WinformTutorial\GenericView\Sample\BS22-500_S19P.gen";
             string[] f = File.ReadAllLines(path);
             
             TreeNode rootNode = new TreeNode("root");
@@ -253,7 +253,7 @@ namespace GenericView
 			int i = 1;
 			while (i < points.Count)
 			{
-				if (points[i]["RADIUS"] == 0)
+				if (points[i].Keys.Contains("RADIUS") && points[i]["RADIUS"] == 0)
 				{
 					ui_canvas2D.DrawCanvas.AddLine(u, v, points[i]["U"], points[i]["V"]); 
 				}
